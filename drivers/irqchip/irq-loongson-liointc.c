@@ -18,17 +18,52 @@
 
 #include <boot_param.h>
 
+#define LIOINTC_INTC_CHIP_START	0x20
+#define LIOINTC_CHIP_HI_OFFSET	0x40
+
+#ifndef CONFIG_CPU_LOONGSON2K
 #define LIOINTC_CHIP_IRQ	32
 #define LIOINTC_NUM_PARENT 4
 
-#define LIOINTC_INTC_CHIP_START	0x20
-
 #define LIOINTC_REG_INTC_STATUS	(LIOINTC_INTC_CHIP_START + 0x20)
+
+#else
+#define LIOINTC_CHIP_IRQ	64
+#define LIOINTC_NUM_PARENT 1
+#define LIOINTC_DEFAULT_CORE 0
+#define LIOINTC_PARENT_INT 2
+
+
+#define LIOINTC_REG_INTC_STATUS	(LIOINTC_INTC_CHIP_START)
+#define LIOINTC_REG_INTC_STATUS_HI	(LIOINTC_INTC_CHIP_START + 0x40)
+#define LIOINTC_REG_INTC_EN_STATUS_HI	(LIOINTC_INTC_CHIP_START + 0x04 + 0x40)
+#define LIOINTC_REG_INTC_ENABLE_HI	(LIOINTC_INTC_CHIP_START + 0x08 + 0x40)
+#define LIOINTC_REG_INTC_DISABLE_HI	(LIOINTC_INTC_CHIP_START + 0x4c)
+#define LIOINTC_REG_INTC_POL_HI	(LIOINTC_INTC_CHIP_START + 0x10 + 0x40)
+#define LIOINTC_REG_INTC_EDGE_HI	(LIOINTC_INTC_CHIP_START + 0x14 + 0x40)
+#define LIOINTC_REG_INTC_BOUNCE	(LIOINTC_INTC_CHIP_START + 0x38)
+#define LIOINTC_REG_INTC_BOUNCE_HI	(LIOINTC_INTC_CHIP_START + 0x38 + 0x40)
+#define LIOINTC_REG_INTC_AUTO	(LIOINTC_INTC_CHIP_START + 0x3c)
+#define LIOINTC_REG_INTC_AUTO_HI	(LIOINTC_INTC_CHIP_START + 0x3c + 0x40)
+#endif
+
 #define LIOINTC_REG_INTC_EN_STATUS	(LIOINTC_INTC_CHIP_START + 0x04)
 #define LIOINTC_REG_INTC_ENABLE	(LIOINTC_INTC_CHIP_START + 0x08)
 #define LIOINTC_REG_INTC_DISABLE	(LIOINTC_INTC_CHIP_START + 0x0c)
 #define LIOINTC_REG_INTC_POL	(LIOINTC_INTC_CHIP_START + 0x10)
 #define LIOINTC_REG_INTC_EDGE	(LIOINTC_INTC_CHIP_START + 0x14)
+
+#define LIOINTC_ENTRY_AUTO(i)	(LIOINTC_CHIP_HI_OFFSET*(i))
+#define LIOINTC_EN_STATUS_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x04 + \
+			LIOINTC_CHIP_HI_OFFSET*(i))
+#define LIOINTC_ENABLE_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x08 + \
+			LIOINTC_CHIP_HI_OFFSET*(i))
+#define LIOINTC_DISABLE_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x0c + \
+			LIOINTC_CHIP_HI_OFFSET*(i))
+#define LIOINTC_POL_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x10 + \
+			LIOINTC_CHIP_HI_OFFSET*(i))
+#define LIOINTC_EDGE_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x14 + \
+			LIOINTC_CHIP_HI_OFFSET*(i))
 
 #define LIOINTC_SHIFT_INTx	4
 
@@ -51,11 +86,18 @@ static void liointc_chained_handle_irq(struct irq_desc *desc)
 	struct liointc_handler_data *handler = irq_desc_get_handler_data(desc);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct irq_chip_generic *gc = handler->priv->gc;
+#ifndef CONFIG_CPU_LOONGSON2K
 	u32 pending;
+#else
+	u64 pending;
+#endif
 
 	chained_irq_enter(chip, desc);
 
 	pending = readl(gc->reg_base + LIOINTC_REG_INTC_STATUS);
+#ifdef CONFIG_CPU_LOONGSON2K
+	pending |= (u64)readl(gc->reg_base + LIOINTC_REG_INTC_STATUS_HI) << 32;
+#endif
 
 	if (!pending) {
 		/* Always blame LPC IRQ if we have that bug */
@@ -94,24 +136,30 @@ static int liointc_set_type(struct irq_data *data, unsigned int type)
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
 	u32 mask = data->mask;
 	unsigned long flags;
+	unsigned long hwirq = data->hwirq;
+	unsigned long index = hwirq/32;
+
+#ifndef CONFIG_CPU_LOONGSON2K
+	BUG_ON(hwirq >= 32);
+#endif
 
 	irq_gc_lock_irqsave(gc, flags);
 	switch (type) {
 	case IRQ_TYPE_LEVEL_HIGH:
-		liointc_set_bit(gc, LIOINTC_REG_INTC_EDGE, mask, false);
-		liointc_set_bit(gc, LIOINTC_REG_INTC_POL, mask, true);
+		liointc_set_bit(gc, LIOINTC_EDGE_AUTO(index), mask, false);
+		liointc_set_bit(gc, LIOINTC_POL_AUTO(index), mask, true);
 		break;
 	case IRQ_TYPE_LEVEL_LOW:
-		liointc_set_bit(gc, LIOINTC_REG_INTC_EDGE, mask, false);
-		liointc_set_bit(gc, LIOINTC_REG_INTC_POL, mask, false);
+		liointc_set_bit(gc, LIOINTC_EDGE_AUTO(index), mask, false);
+		liointc_set_bit(gc, LIOINTC_POL_AUTO(index), mask, false);
 		break;
 	case IRQ_TYPE_EDGE_RISING:
-		liointc_set_bit(gc, LIOINTC_REG_INTC_EDGE, mask, true);
-		liointc_set_bit(gc, LIOINTC_REG_INTC_POL, mask, true);
+		liointc_set_bit(gc, LIOINTC_EDGE_AUTO(index), mask, true);
+		liointc_set_bit(gc, LIOINTC_POL_AUTO(index), mask, true);
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
-		liointc_set_bit(gc, LIOINTC_REG_INTC_EDGE, mask, true);
-		liointc_set_bit(gc, LIOINTC_REG_INTC_POL, mask, false);
+		liointc_set_bit(gc, LIOINTC_EDGE_AUTO(index), mask, true);
+		liointc_set_bit(gc, LIOINTC_POL_AUTO(index), mask, false);
 		break;
 	default:
 		return -EINVAL;
@@ -131,11 +179,19 @@ static void liointc_resume(struct irq_chip_generic *gc)
 	irq_gc_lock_irqsave(gc, flags);
 	/* Disable all at first */
 	writel(0xffffffff, gc->reg_base + LIOINTC_REG_INTC_DISABLE);
+#ifdef CONFIG_CPU_LOONGSON2K
+	writel(0xffffffff, gc->reg_base + LIOINTC_REG_INTC_DISABLE_HI);
+#endif
+
 	/* Revert map cache */
 	for (i = 0; i < LIOINTC_CHIP_IRQ; i++)
-		writeb(priv->map_cache[i], gc->reg_base + i);
+		writeb(priv->map_cache[i],
+				gc->reg_base + LIOINTC_ENTRY_AUTO(i/32) + i);
 	/* Revert mask cache */
 	writel(~gc->mask_cache, gc->reg_base + LIOINTC_REG_INTC_ENABLE);
+#ifdef CONFIG_CPU_LOONGSON2K
+	writel(~gc->mask_cache, gc->reg_base + LIOINTC_REG_INTC_ENABLE_HI);
+#endif
 	irq_gc_unlock_irqrestore(gc, flags);
 }
 
@@ -179,7 +235,7 @@ int __init liointc_of_init(struct device_node *node,
 						&of_parent_int_map[0],
 						LIOINTC_NUM_PARENT,
 						LIOINTC_NUM_PARENT);
-	if (sz < 4) {
+	if (sz < LIOINTC_NUM_PARENT) {
 		pr_err("loongson-liointc: No parent_int_map\n");
 		err = -ENODEV;
 		goto out_iounmap;
@@ -189,7 +245,7 @@ int __init liointc_of_init(struct device_node *node,
 		priv->handler[i].parent_int_map = of_parent_int_map[i];
 
 	/* Setup IRQ domain */
-	domain = irq_domain_add_linear(node, 32,
+	domain = irq_domain_add_linear(node, LIOINTC_CHIP_IRQ,
 					&irq_generic_chip_ops, priv);
 	if (!domain) {
 		pr_err("loongson-liointc: cannot add IRQ domain\n");
@@ -197,7 +253,8 @@ int __init liointc_of_init(struct device_node *node,
 		goto out_iounmap;
 	}
 
-	err = irq_alloc_domain_generic_chips(domain, 32, 1,
+	/*gc's max irq per chip is 32*/
+	err = irq_alloc_domain_generic_chips(domain, 32, LIOINTC_CHIP_IRQ/32,
 					node->full_name, handle_level_irq,
 					IRQ_NOPROBE, 0, 0);
 	if (err) {
@@ -210,6 +267,11 @@ int __init liointc_of_init(struct device_node *node,
 	writel(0xffffffff, base + LIOINTC_REG_INTC_DISABLE);
 	/* Set to level triggered */
 	writel(0x0, base + LIOINTC_REG_INTC_EDGE);
+
+#ifdef CONFIG_CPU_LOONGSON2K
+	writel(0xffffffff, base + LIOINTC_REG_INTC_DISABLE_HI);
+	writel(0x0, base + LIOINTC_REG_INTC_EDGE_HI);
+#endif
 
 	/* Generate parent INT part of map cache */
 	for (i = 0; i < LIOINTC_NUM_PARENT; i++) {
@@ -225,26 +287,39 @@ int __init liointc_of_init(struct device_node *node,
 
 	for (i = 0; i < LIOINTC_CHIP_IRQ; i++) {
 		/* Generate core part of map cache */
+#ifndef CONFIG_CPU_LOONGSON2K
 		priv->map_cache[i] |= BIT(loongson_sysconf.boot_cpu_id);
-		writeb(priv->map_cache[i], base + i);
+#else
+		/*The simplest support, Loongson 2k use fixed configuration*/
+		priv->map_cache[i] =
+			1 << (LIOINTC_PARENT_INT + LIOINTC_SHIFT_INTx) |
+			1 << LIOINTC_DEFAULT_CORE;
+#endif
+		writeb(priv->map_cache[i],
+				base + LIOINTC_ENTRY_AUTO(i/32) + i);
 	}
 
-	gc = irq_get_domain_generic_chip(domain, 0);
-	gc->private = priv;
-	gc->reg_base = base;
-	gc->domain = domain;
-	gc->resume = liointc_resume;
+	/*gc's max irq per chip is 32*/
+	for (i = 0; i < LIOINTC_CHIP_IRQ/32; i++) {
+		gc = irq_get_domain_generic_chip(domain, i*32);
+		gc->private = priv;
+		gc->reg_base = base;
+		gc->domain = domain;
+		gc->resume = liointc_resume;
 
-	ct = gc->chip_types;
-	ct->regs.enable = LIOINTC_REG_INTC_ENABLE;
-	ct->regs.disable = LIOINTC_REG_INTC_DISABLE;
-	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
-	ct->chip.irq_mask = irq_gc_mask_disable_reg;
-	ct->chip.irq_mask_ack = irq_gc_mask_disable_reg;
-	ct->chip.irq_set_type = liointc_set_type;
+		ct = gc->chip_types;
+		ct->regs.enable = LIOINTC_REG_INTC_ENABLE +
+			i*LIOINTC_CHIP_HI_OFFSET;
+		ct->regs.disable = LIOINTC_REG_INTC_DISABLE +
+			i*LIOINTC_CHIP_HI_OFFSET;
+		ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
+		ct->chip.irq_mask = irq_gc_mask_disable_reg;
+		ct->chip.irq_mask_ack = irq_gc_mask_disable_reg;
+		ct->chip.irq_set_type = liointc_set_type;
 
-	gc->mask_cache = 0xffffffff;
-	priv->gc = gc;
+		gc->mask_cache = 0xffffffff;
+		priv->gc = gc;
+	}
 
 	for (i = 0; i < LIOINTC_NUM_PARENT; i++) {
 		if (parent_irq[i] <= 0)
@@ -267,5 +342,9 @@ out_free_priv:
 	return err;
 }
 
-IRQCHIP_DECLARE(loongson_liointc_1_0, "loongson,liointc-1.0", liointc_of_init);
-IRQCHIP_DECLARE(loongson_liointc_1_0a, "loongson,liointc-1.0a", liointc_of_init);
+IRQCHIP_DECLARE(loongson_liointc_1_0,
+		"loongson,liointc-1.0",
+		liointc_of_init);
+IRQCHIP_DECLARE(loongson_liointc_1_0a,
+		"loongson,liointc-1.0a",
+		liointc_of_init);

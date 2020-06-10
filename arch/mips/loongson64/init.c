@@ -48,12 +48,19 @@ void __init prom_init(void)
 	/* init base address of io space */
 	set_io_port_base(PCI_IOBASE);
 
-	loongson_sysconf.early_config();
+	if (loongson_sysconf.early_config != NULL)
+		loongson_sysconf.early_config();
 
+#ifdef CONFIG_NUMA
 	prom_init_numa_memory();
+#endif
 
 	/* Hardcode to CPU UART 0 */
+#ifndef CONFIG_CPU_LOONGSON2K
 	setup_8250_early_printk_port(TO_UNCAC(LOONGSON_REG_BASE + 0x1e0), 0, 1024);
+#else
+	setup_8250_early_printk_port(TO_UNCAC(LOONGSON_REG_BASE), 0, 1024);
+#endif
 
 	register_smp_ops(&loongson3_smp_ops);
 	board_nmi_handler_setup = mips_nmi_setup;

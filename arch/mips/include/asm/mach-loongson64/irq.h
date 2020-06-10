@@ -5,7 +5,11 @@
 #include <boot_param.h>
 
 /* cpu core interrupt numbers */
+#ifdef CONFIG_CPU_LOONGSON2K
+#define MIPS_CPU_IRQ_BASE 0
+#else
 #define MIPS_CPU_IRQ_BASE 56
+#endif
 
 #include <asm/mach-generic/irq.h>
 

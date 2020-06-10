@@ -343,7 +343,8 @@ static void loongson3_init_secondary(void)
 	uint32_t initcount;
 	unsigned int cpu = smp_processor_id();
 	unsigned int imask = STATUSF_IP7 | STATUSF_IP6 |
-			     STATUSF_IP3 | STATUSF_IP2;
+						STATUSF_IP5 | STATUSF_IP4 |
+						STATUSF_IP3 | STATUSF_IP2;
 
 	/* Set interrupt mask, but don't enable */
 	change_c0_status(ST0_IM, imask);
@@ -767,6 +768,10 @@ static int loongson3_enable_clock(unsigned int cpu)
 {
 	uint64_t core_id = cpu_core(&cpu_data[cpu]);
 	uint64_t package_id = cpu_data[cpu].package;
+
+#ifdef CONFIG_CPU_LOONGSON2K
+	return 0;
+#endif
 
 	if ((read_c0_prid() & PRID_REV_MASK) == PRID_REV_LOONGSON3A_R1) {
 		LOONGSON_CHIPCFG(package_id) |= 1 << (12 + core_id);

@@ -470,13 +470,13 @@ config MACH_LOONGSON64
 	select SYS_HAS_EARLY_PRINTK
 	select SYS_SUPPORTS_SMP
 	select SYS_SUPPORTS_HOTPLUG_CPU
-	select SYS_SUPPORTS_NUMA
+	select SYS_SUPPORTS_NUMA if !CPU_LOONGSON2K
 	select SYS_SUPPORTS_64BIT_KERNEL
 	select SYS_SUPPORTS_HIGHMEM
 	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select SYS_SUPPORTS_ZBOOT
 	select ZONE_DMA32
-	select NUMA
+	select NUMA if !CPU_LOONGSON2K
 	select COMMON_CLK
 	select USE_OF
 	select BUILTIN_DTB
@@ -1454,6 +1454,15 @@ config CPU_LOONGSON3_CPUCFG_EMULATION
 	  cores, back to Loongson-3A1000.
 
 	  If unsure, please say Y.
+
+config CPU_LOONGSON2K
+	bool "Loongson 2K"
+	default n
+	depends on CPU_LOONGSON64
+	help
+	  The Loongson 2K is a 64-bit SoC, which use Loongson GS264 core.
+
+	  If use Loongson 2K processor, please say Y.
 
 config CPU_LOONGSON2E
 	bool "Loongson 2E"

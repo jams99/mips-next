@@ -20,6 +20,7 @@
 #include <boot_param.h>
 #include <builtin_dtbs.h>
 #include <workarounds.h>
+#include <asm/prom.h>
 
 #define HOST_BRIDGE_CONFIG_ADDR	((void __iomem *)TO_UNCAC(0x1a000000))
 
@@ -39,6 +40,8 @@ const char *get_system_type(void)
 	return "Generic Loongson64 System";
 }
 
+/*Now, Loongson 2K only parse dtb*/
+#ifndef CONFIG_CPU_LOONGSON2K
 void __init prom_init_env(void)
 {
 	struct boot_params *boot_p;
@@ -199,3 +202,33 @@ void __init prom_init_env(void)
 		loongson_sysconf.early_config = rs780e_early_config;
 	}
 }
+#else
+void __init prom_init_env(void)
+{
+	/* pmon passes arguments in 32bit pointers */
+	unsigned int processor_id;
+
+#ifdef CONFIG_USE_OF
+	/* using built-in dtb */
+	loongson_fdt_blob = (void *)__dtb_loongson2k1000_eval_begin;
+#endif
+	smp_group[0] = 0xffffffffbfe11000;
+
+	loongson_sysconf.nr_cpus = NR_CPUS;
+	loongson_sysconf.boot_cpu_id = 0;
+
+	if (cpu_clock_freq == 0) {
+		processor_id = (&current_cpu_data)->processor_id;
+		switch (processor_id & PRID_REV_MASK) {
+		case PRID_REV_LOONGSON2K_R1_0:
+		case PRID_REV_LOONGSON2K_R1_1:
+		case PRID_REV_LOONGSON2K_R1_2:
+		case PRID_REV_LOONGSON2K_R1_3:
+			cpu_clock_freq = 800000000;
+			break;
+		}
+	}
+
+	pr_info("CpuClock = %u\n", cpu_clock_freq);
+}
+#endif
