@@ -36,7 +36,7 @@
 			compatible = "mti,cpu-interrupt-controller";
 		};
 
-		icu: interrupt-controller@1fe11400 {
+		icu: interrupt-controller@1fe11000 {
 			compatible = "loongson,liointc-1.0";
 			interrupt-controller;
 			#interrupt-cells = <1>;

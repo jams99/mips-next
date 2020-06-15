@@ -260,6 +260,7 @@ int __init liointc_of_init(struct device_node *node,
 	int dispatch_mode = 0;
 	u8 core_mask = 0;
 	int sz, i, err = 0;
+	const char *name = NULL;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -310,9 +311,16 @@ int __init liointc_of_init(struct device_node *node,
 		goto out_iounmap;
 	}
 
+	name = of_get_property(node, "compatible", NULL);
+	if (name == NULL) {
+		pr_err("loongson-liointc: cannot find compatible property\n");
+		err = -EINVAL;
+		goto out_iounmap;
+	}
+
 	/*gc's max irq per chip is 32*/
 	err = irq_alloc_domain_generic_chips(domain, 32, LIOINTC_CHIP_IRQ/32,
-					node->full_name, handle_level_irq,
+					name, handle_level_irq,
 					IRQ_NOPROBE, 0, 0);
 	if (err) {
 		pr_err("loongson-liointc: unable to register IRQ domain\n");
