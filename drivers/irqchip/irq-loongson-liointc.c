@@ -18,34 +18,14 @@
 
 #include <boot_param.h>
 
-#define LIOINTC_INTC_CHIP_START	0x20
 #define LIOINTC_CHIP_HI_OFFSET	0x40
 
 #ifndef CONFIG_CPU_LOONGSON2K
+#define LIOINTC_INTC_CHIP_START	0x20
 #define LIOINTC_CHIP_IRQ	32
 #define LIOINTC_NUM_PARENT 4
 
 #define LIOINTC_REG_INTC_STATUS	(LIOINTC_INTC_CHIP_START + 0x20)
-
-#else
-#define LIOINTC_CHIP_IRQ	64
-#define LIOINTC_NUM_PARENT 1
-#define LIOINTC_DEFAULT_CORE 0
-#define LIOINTC_PARENT_INT 2
-
-
-#define LIOINTC_REG_INTC_STATUS	(LIOINTC_INTC_CHIP_START)
-#define LIOINTC_REG_INTC_STATUS_HI	(LIOINTC_INTC_CHIP_START + 0x40)
-#define LIOINTC_REG_INTC_EN_STATUS_HI	(LIOINTC_INTC_CHIP_START + 0x04 + 0x40)
-#define LIOINTC_REG_INTC_ENABLE_HI	(LIOINTC_INTC_CHIP_START + 0x08 + 0x40)
-#define LIOINTC_REG_INTC_DISABLE_HI	(LIOINTC_INTC_CHIP_START + 0x4c)
-#define LIOINTC_REG_INTC_POL_HI	(LIOINTC_INTC_CHIP_START + 0x10 + 0x40)
-#define LIOINTC_REG_INTC_EDGE_HI	(LIOINTC_INTC_CHIP_START + 0x14 + 0x40)
-#define LIOINTC_REG_INTC_BOUNCE	(LIOINTC_INTC_CHIP_START + 0x38)
-#define LIOINTC_REG_INTC_BOUNCE_HI	(LIOINTC_INTC_CHIP_START + 0x38 + 0x40)
-#define LIOINTC_REG_INTC_AUTO	(LIOINTC_INTC_CHIP_START + 0x3c)
-#define LIOINTC_REG_INTC_AUTO_HI	(LIOINTC_INTC_CHIP_START + 0x3c + 0x40)
-#endif
 
 #define LIOINTC_REG_INTC_EN_STATUS	(LIOINTC_INTC_CHIP_START + 0x04)
 #define LIOINTC_REG_INTC_ENABLE	(LIOINTC_INTC_CHIP_START + 0x08)
@@ -53,7 +33,35 @@
 #define LIOINTC_REG_INTC_POL	(LIOINTC_INTC_CHIP_START + 0x10)
 #define LIOINTC_REG_INTC_EDGE	(LIOINTC_INTC_CHIP_START + 0x14)
 
-#define LIOINTC_ENTRY_AUTO(i)	(LIOINTC_CHIP_HI_OFFSET*(i))
+#else
+#define LIOINTC_INTC_CHIP_START	0x400
+#define LIOINTC_CHIP_IRQ	64
+#define LIOINTC_NUM_PARENT 1
+#define LIOINTC_DEFAULT_CORE 0
+#define LIOINTC_PARENT_INT 2
+
+
+#define LIOINTC_REG_INTC_STATUS(cpu)	(0x40 + 0x100*(cpu))
+#define LIOINTC_REG_INTC_STATUS_HI(cpu)	(0x48 + 0x100*(cpu))
+
+#define LIOINTC_REG_INTC_EN_STATUS_HI	(LIOINTC_INTC_CHIP_START + 0x64)
+#define LIOINTC_REG_INTC_ENABLE_HI	(LIOINTC_INTC_CHIP_START + 0x68)
+#define LIOINTC_REG_INTC_DISABLE_HI	(LIOINTC_INTC_CHIP_START + 0x6c)
+#define LIOINTC_REG_INTC_POL_HI	(LIOINTC_INTC_CHIP_START + 0x70)
+#define LIOINTC_REG_INTC_EDGE_HI	(LIOINTC_INTC_CHIP_START + 0x74)
+#define LIOINTC_REG_INTC_BOUNCE	(LIOINTC_INTC_CHIP_START + 0x38)
+#define LIOINTC_REG_INTC_BOUNCE_HI	(LIOINTC_INTC_CHIP_START + 0x78)
+#define LIOINTC_REG_INTC_AUTO	(LIOINTC_INTC_CHIP_START + 0x3c)
+#define LIOINTC_REG_INTC_AUTO_HI	(LIOINTC_INTC_CHIP_START + 0x7c)
+
+#define LIOINTC_REG_INTC_EN_STATUS	(LIOINTC_INTC_CHIP_START + 0x24)
+#define LIOINTC_REG_INTC_ENABLE	(LIOINTC_INTC_CHIP_START + 0x28)
+#define LIOINTC_REG_INTC_DISABLE	(LIOINTC_INTC_CHIP_START + 0x2c)
+#define LIOINTC_REG_INTC_POL	(LIOINTC_INTC_CHIP_START + 0x30)
+#define LIOINTC_REG_INTC_EDGE	(LIOINTC_INTC_CHIP_START + 0x34)
+#endif
+
+#define LIOINTC_ENTRY_AUTO(i)	(LIOINTC_INTC_CHIP_START + LIOINTC_CHIP_HI_OFFSET*(i))
 #define LIOINTC_EN_STATUS_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x04 + \
 			LIOINTC_CHIP_HI_OFFSET*(i))
 #define LIOINTC_ENABLE_AUTO(i)	(LIOINTC_INTC_CHIP_START + 0x08 + \
@@ -68,6 +76,11 @@
 #define LIOINTC_SHIFT_INTx	4
 
 #define LIOINTC_ERRATA_IRQ	10
+
+#define LIOINTC_IRQ_DISPATCH_DEFAULT		0
+#define LIOINTC_IRQ_DISPATCH_BOUNCE			1
+#define LIOINTC_IRQ_DISPATCH_AUTO			2
+#define LIOINTC_IRQ_DISPATCH_AUTO_BOUNCE	3
 
 struct liointc_handler_data {
 	struct liointc_priv	*priv;
@@ -90,13 +103,16 @@ static void liointc_chained_handle_irq(struct irq_desc *desc)
 	u32 pending;
 #else
 	u64 pending;
+	int cpu = smp_processor_id();
 #endif
 
 	chained_irq_enter(chip, desc);
 
+#ifndef CONFIG_CPU_LOONGSON2K
 	pending = readl(gc->reg_base + LIOINTC_REG_INTC_STATUS);
-#ifdef CONFIG_CPU_LOONGSON2K
-	pending |= (u64)readl(gc->reg_base + LIOINTC_REG_INTC_STATUS_HI) << 32;
+#else
+	pending = readl(gc->reg_base + LIOINTC_REG_INTC_STATUS(cpu));
+	pending |= (u64)readl(gc->reg_base + LIOINTC_REG_INTC_STATUS_HI(cpu)) << 32;
 #endif
 
 	if (!pending) {
@@ -170,6 +186,39 @@ static int liointc_set_type(struct irq_data *data, unsigned int type)
 	return 0;
 }
 
+static int liointc_set_dispatch_mode(void *base, int mode)
+{
+	switch (mode) {
+	case LIOINTC_IRQ_DISPATCH_BOUNCE:
+		writel(0xffffffff, base + LIOINTC_REG_INTC_BOUNCE);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_BOUNCE_HI);
+		writel(0, base + LIOINTC_REG_INTC_AUTO);
+		writel(0, base + LIOINTC_REG_INTC_AUTO_HI);
+		break;
+	case LIOINTC_IRQ_DISPATCH_AUTO:
+		writel(0, base + LIOINTC_REG_INTC_BOUNCE);
+		writel(0, base + LIOINTC_REG_INTC_BOUNCE_HI);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_AUTO);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_AUTO_HI);
+		break;
+	case LIOINTC_IRQ_DISPATCH_AUTO_BOUNCE:
+		writel(0xffffffff, base + LIOINTC_REG_INTC_BOUNCE);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_BOUNCE_HI);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_AUTO);
+		writel(0xffffffff, base + LIOINTC_REG_INTC_AUTO_HI);
+		break;
+	default:
+		/*default*/
+		writel(0, base + LIOINTC_REG_INTC_BOUNCE);
+		writel(0, base + LIOINTC_REG_INTC_BOUNCE_HI);
+		writel(0, base + LIOINTC_REG_INTC_AUTO);
+		writel(0, base + LIOINTC_REG_INTC_AUTO_HI);
+		break;
+	}
+
+	return 0;
+}
+
 static void liointc_resume(struct irq_chip_generic *gc)
 {
 	struct liointc_priv *priv = gc->private;
@@ -208,6 +257,8 @@ int __init liointc_of_init(struct device_node *node,
 	u32 of_parent_int_map[LIOINTC_NUM_PARENT];
 	int parent_irq[LIOINTC_NUM_PARENT];
 	bool have_parent = FALSE;
+	int dispatch_mode = 0;
+	u8 core_mask = 0;
 	int sz, i, err = 0;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -241,6 +292,12 @@ int __init liointc_of_init(struct device_node *node,
 		goto out_iounmap;
 	}
 
+	sz = of_property_read_u32_index(node, "dispatch-mode",
+						0, &dispatch_mode);
+	if (sz) {
+		pr_info("loongson-liointc: No dispatch-mode\n");
+	}
+
 	for (i = 0; i < LIOINTC_NUM_PARENT; i++)
 		priv->handler[i].parent_int_map = of_parent_int_map[i];
 
@@ -262,7 +319,6 @@ int __init liointc_of_init(struct device_node *node,
 		goto out_free_domain;
 	}
 
-
 	/* Disable all IRQs */
 	writel(0xffffffff, base + LIOINTC_REG_INTC_DISABLE);
 	/* Set to level triggered */
@@ -271,6 +327,8 @@ int __init liointc_of_init(struct device_node *node,
 #ifdef CONFIG_CPU_LOONGSON2K
 	writel(0xffffffff, base + LIOINTC_REG_INTC_DISABLE_HI);
 	writel(0x0, base + LIOINTC_REG_INTC_EDGE_HI);
+
+	liointc_set_dispatch_mode(base, dispatch_mode);
 #endif
 
 	/* Generate parent INT part of map cache */
@@ -290,10 +348,10 @@ int __init liointc_of_init(struct device_node *node,
 #ifndef CONFIG_CPU_LOONGSON2K
 		priv->map_cache[i] |= BIT(loongson_sysconf.boot_cpu_id);
 #else
-		/*The simplest support, Loongson 2k use fixed configuration*/
+		core_mask = 0x3;
 		priv->map_cache[i] =
 			1 << (LIOINTC_PARENT_INT + LIOINTC_SHIFT_INTx) |
-			1 << LIOINTC_DEFAULT_CORE;
+			core_mask << LIOINTC_DEFAULT_CORE;
 #endif
 		writeb(priv->map_cache[i],
 				base + LIOINTC_ENTRY_AUTO(i/32) + i);

@@ -40,10 +40,10 @@
 			compatible = "loongson,liointc-1.0";
 			interrupt-controller;
 			#interrupt-cells = <1>;
-			reg = <0x1fe11400 0x40>;
+			reg = <0x1fe11000 0x40>;
 
 			/*bounce mode*/
-			dispatch-mode = <0>;
+			dispatch-mode = <1>;
 
 			interrupt-parent = <&cpuintc>;
 			interrupts = <4>;
