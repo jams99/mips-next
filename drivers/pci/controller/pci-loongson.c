@@ -25,6 +25,8 @@
 #define FLAG_CFG1	BIT(1)
 #define FLAG_DEV_FIX	BIT(2)
 
+#define LOONGSON2K_CONFIG_BASE_TP0  0xfe00000000
+
 struct loongson_pci {
 	void __iomem *cfg0_base;
 	void __iomem *cfg1_base;
@@ -109,8 +111,13 @@ static void __iomem *cfg0_map(struct loongson_pci *priv, int bus,
 {
 	unsigned long addroff = 0x0;
 
+#if 0
 	if (bus != 0)
 		addroff |= BIT(24); /* Type 1 Access */
+#else
+	if (bus != 0)
+		addroff |= BIT(28); /* Type 1 Access */
+#endif
 	addroff |= (bus << 16) | (devfn << 8) | where;
 	return priv->cfg0_base + addroff;
 }
@@ -182,7 +189,7 @@ static int loongson_pci_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
 	struct pci_host_bridge *bridge;
-	struct resource *regs;
+	struct resource *bus_range;
 	int err;
 
 	if (!node)
@@ -196,6 +203,10 @@ static int loongson_pci_probe(struct platform_device *pdev)
 	priv->pdev = pdev;
 	priv->flags = (unsigned long)of_device_get_match_data(dev);
 
+#ifdef CONFIG_CPU_LOONGSON2K
+	priv->cfg0_base = (void *)TO_UNCAC(LOONGSON2K_CONFIG_BASE_TP0);
+#else
+	struct resource *regs;
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!regs) {
 		dev_err(dev, "missing mem resources for cfg0\n");
@@ -217,9 +228,10 @@ static int loongson_pci_probe(struct platform_device *pdev)
 				priv->cfg1_base = NULL;
 		}
 	}
+#endif
 
 	err = pci_parse_request_of_pci_ranges(dev, &bridge->windows,
-						&bridge->dma_ranges, NULL);
+						&bridge->dma_ranges, &bus_range);
 	if (err) {
 		dev_err(dev, "failed to get bridge resources\n");
 		return err;
@@ -229,6 +241,7 @@ static int loongson_pci_probe(struct platform_device *pdev)
 	bridge->sysdata = priv;
 	bridge->ops = &loongson_pci_ops;
 	bridge->map_irq = loongson_map_irq;
+	bridge->busnr = bus_range->start;
 
 	err = pci_host_probe(bridge);
 	if (err)

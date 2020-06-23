@@ -17,12 +17,14 @@
 
 	soc {
 		compatible = "ls,nbus", "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0x10000000 0 0x10000000 0x10000000
-				0x40000000 0 0x40000000 0x40000000
-				0x20000000 0 0x20000000 0x20000000
-				0x0d000000 0 0x0d000000 0x02000000>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		//<bus-address1 parent-bus-address2 size1>
+		ranges = <0 0x10000000 0 0x10000000 0 0x10000000
+				  0 0x40000000 0 0x40000000 0 0x40000000
+				  0 0x20000000 0 0x20000000 0 0x20000000
+				  0 0x0d000000 0 0x0d000000 0 0x02000000
+				  0xfe 0x00000000 0xfe 0x00000000 0 0x10000000>;
 
 		dma-coherent;
 		nr_cpus_loongson = <2>;
@@ -40,7 +42,7 @@
 			compatible = "loongson,liointc-1.0";
 			interrupt-controller;
 			#interrupt-cells = <1>;
-			reg = <0x1fe11000 0x40>;
+			reg = <0 0x1fe11000 0 0x40>;
 
 			/*bounce mode*/
 			dispatch-mode = <1>;
@@ -53,10 +55,120 @@
 			loongson,parent_int_map = <0xf0ffffff>;
 		};
 
+		pcie0_port0 {
+			compatible = "loongson,ls2k-pci";
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+			#interrupt-cells = <1>;
+
+			bus-range = <0x1 0x3>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			//io range
+			ranges = <0x1000000 0x0 0x18008000 0x0 0x18008000 0x0 0x1000>,
+			//mem range
+					 <0x2000000 0x0 0x40500000 0x0 0x40500000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 32>;
+		};
+
+		pcie0_port1 {
+			compatible = "loongson,ls2k-pci";
+			#interrupt-cells = <1>;
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			bus-range = <0x4 0x6>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			ranges = <0x1000000 0x0 0x18007000 0x0 0x18007000 0x0 0x1000>,
+					 <0x2000000 0x0 0x40400000 0x0 0x40400000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 33>;
+		};
+
+		pcie0_port2 {
+			compatible = "loongson,ls2k-pci";
+			#interrupt-cells = <1>;
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			bus-range = <0x8 0xa>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			ranges = <0x1000000 0x0 0x18006000 0x0 0x18006000 0x0 0x1000>,
+					 <0x2000000 0x0 0x40300000 0x0 0x40300000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 34>;
+		};
+
+		pcie0_port3 {
+			compatible = "loongson,ls2k-pci";
+			#interrupt-cells = <1>;
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			bus-range = <0xc 0xe>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			ranges = <0x1000000 0x0 0x18005000 0x0 0x18005000 0x0 0x1000>,
+					 <0x2000000 0x0 0x40200000 0x0 0x40200000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 35>;
+		};
+
+		pcie1_port0 {
+			compatible = "loongson,ls2k-pci";
+			#interrupt-cells = <1>;
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			bus-range = <0x10 0x12>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			ranges = <0x1000000 0x0 0x18004000 0x0 0x18004000 0x0 0x1000>,
+					 <0x2000000 0x0 0x40100000 0x0 0x40100000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 36>;
+		};
+
+		pcie1_port1 {
+			compatible = "loongson,ls2k-pci";
+			#interrupt-cells = <1>;
+			interrupt-parent = <&icu>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			bus-range = <0x14 0x16>;
+ 
+			// flag(1) pciaddr(2) cpuaddr(2) size(2)
+			ranges = <0x1000000 0x0 0x19fff000 0x0 0x19fff000 0x0 0x1000>,
+					 <0x2000000 0x0 0x17f00000 0x0 0x17f00000 0x0 0x100000>;
+
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &icu 37>;
+		};
 		serial@0x1fe00000{
 			device_type = "serial";
 			compatible = "ns16550";
-			reg = <0x1fe00000 0x100>;
+			reg = <0 0x1fe00000 0 0x100>;
 			clock-frequency = <125000000>;
 			interrupt-parent = <&icu>;
 			interrupts = <0>;
