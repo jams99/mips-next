@@ -235,7 +235,8 @@ static void liointc_resume(struct irq_chip_generic *gc)
 	/* Revert map cache */
 	for (i = 0; i < LIOINTC_CHIP_IRQ; i++)
 		writeb(priv->map_cache[i],
-				gc->reg_base + LIOINTC_ENTRY_AUTO(i/32) + i);
+				gc->reg_base + LIOINTC_ENTRY_AUTO(i/32) + i%32);
+
 	/* Revert mask cache */
 	writel(~gc->mask_cache, gc->reg_base + LIOINTC_REG_INTC_ENABLE);
 #ifdef CONFIG_CPU_LOONGSON2K
@@ -362,7 +363,7 @@ int __init liointc_of_init(struct device_node *node,
 			core_mask << LIOINTC_DEFAULT_CORE;
 #endif
 		writeb(priv->map_cache[i],
-				base + LIOINTC_ENTRY_AUTO(i/32) + i);
+				base + LIOINTC_ENTRY_AUTO(i/32) + i%32);
 	}
 
 	/*gc's max irq per chip is 32*/
